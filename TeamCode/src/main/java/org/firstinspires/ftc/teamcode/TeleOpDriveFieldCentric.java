@@ -44,7 +44,7 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
                 robot.armPosition = robot.ARM_HIGH_BASKET;
             } else if (gamepad1.right_trigger > 0.0) {
                 robot.armPosition = robot.ARM_LOW_BASKET;
-            } else if (gamepad1.dpad_down) {
+            } else if (gamepad1.right_trigger == 0) {
                 robot.armPosition = robot.ARM_START;
             }
 

@@ -117,8 +117,8 @@ public class RobotHardware {
         set position of the arm.
         */
         ARM_START = 0 * ARM_TICKS_PER_DEGREE;
-        ARM_LOW_BASKET = 360 * ARM_TICKS_PER_DEGREE;
-        ARM_HIGH_BASKET = 360 * 2 * ARM_TICKS_PER_DEGREE;
+        ARM_LOW_BASKET = 360 * 2 * ARM_TICKS_PER_DEGREE;
+        ARM_HIGH_BASKET = 360 * 6 * ARM_TICKS_PER_DEGREE;
         ARM_LOW_RUNG = 360 * ARM_TICKS_PER_DEGREE;
         ARM_HIGH_RUNG = 360 * 2 * ARM_TICKS_PER_DEGREE;
         armPosition = (int)ARM_START;
@@ -147,12 +147,12 @@ public class RobotHardware {
          wheel that runs backward. Keep testing until ALL the wheels move the robot forward when you push the left
          joystick forward.
          */
-        leftFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        leftBackDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightBackDrive.setDirection(DcMotor.Direction.REVERSE);
-        leftArmDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightArmDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
+        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
+        leftArmDrive.setDirection(DcMotor.Direction.REVERSE);
+        rightArmDrive.setDirection(DcMotorSimple.Direction.FORWARD);
 
         // Ensure the robot is stationary. Reset the encoders and set the motors to BREAK mode
         leftFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);

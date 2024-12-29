@@ -2,10 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.*;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
@@ -20,8 +17,14 @@ public class RobotHardware {
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
-    private DcMotor leftArmDrive = null;
-    private DcMotor rightArmDrive = null;
+    private DcMotor leftVerticalArmDrive = null;
+    private DcMotor rightVerticalArmDrive = null;
+    private Servo verticalWristDrive = null;
+    private Servo verticalClawDrive = null;
+    private Servo leftHorizontalArmDrive = null;
+    private Servo rightHorizontalArmDrive = null;
+    private Servo horizontalWristDrive = null;
+    private Servo horizontalClawDrive = null;
 
     // Define Sensor objects (Make them private so that they CANT be accessed externally)
     private IMU imu = null; // Universal IMU interface
@@ -57,13 +60,22 @@ public class RobotHardware {
 
     public double ARM_TICKS_PER_DEGREE;
 
-    public double ARM_START;
-    public double ARM_LOW_BASKET;
-    public double ARM_HIGH_BASKET;
-    public double ARM_LOW_RUNG;
-    public double ARM_HIGH_RUNG;
+    public double VERTICAL_ARM_TRANSFER;
+    public double VERTICAL_ARM_LOW_BASKET;
+    public double VERTICAL_ARM_HIGH_BASKET;
+    public double VERTICAL_ARM_LOW_RUNG;
+    public double VERTICAL_ARM_HIGH_RUNG;
 
-    public double armPosition;
+    public double VERTICAL_WRIST_TRANSFER;
+    public double VERTICAL_WRIST_DEPOSIT;
+
+    public double HORIZONTAL_WRIST_TRANSFER;
+    public double HORIZONTAL_WRIST_PICKUP;
+
+    public double CLAW_OPEN;
+    public double CLAW_CLOSE;
+
+    public double verticalArmPosition;
 
     // Define a constructor that allows the OpMode to pass a reference to itself.
     public RobotHardware(LinearOpMode opmode) {
@@ -83,8 +95,14 @@ public class RobotHardware {
         leftBackDrive = myOpMode.hardwareMap.get(DcMotor.class, "left_back_drive");
         rightFrontDrive = myOpMode.hardwareMap.get(DcMotor.class, "right_front_drive");
         rightBackDrive = myOpMode.hardwareMap.get(DcMotor.class, "right_back_drive");
-        leftArmDrive = myOpMode.hardwareMap.get(DcMotor.class, "left_arm_drive");
-        rightArmDrive = myOpMode.hardwareMap.get(DcMotor. class, "right_arm_drive");
+        leftVerticalArmDrive = myOpMode.hardwareMap.get(DcMotor.class, "left_vertical_arm_drive");
+        rightVerticalArmDrive = myOpMode.hardwareMap.get(DcMotor. class, "right_vertical_arm_drive");
+        verticalWristDrive = myOpMode.hardwareMap.get(Servo.class, "vertical_wrist_drive");
+        verticalClawDrive = myOpMode.hardwareMap.get(Servo.class, "vertical_claw_drive");
+        leftHorizontalArmDrive = myOpMode.hardwareMap.get(Servo.class, "left_horizontal_arm_drive");
+        rightHorizontalArmDrive = myOpMode.hardwareMap.get(Servo.class, "right_horizontal_arm_drive");
+        horizontalWristDrive = myOpMode.hardwareMap.get(Servo.class, "horizontal_wrist_drive");
+        horizontalClawDrive = myOpMode.hardwareMap.get(Servo.class, "horizontal_claw_drive");
 
         DRIVE_SPEED = 0.6; // Maximum autonomous driving speed for better distance accuracy.
         STRAFE_SPEED = 0.6; // Maximum autonomous strafing speed for better distance accuracy.
@@ -116,12 +134,22 @@ public class RobotHardware {
         per degree of the arm. This results in the number of encoders ticks the arm needs to move to achieve the ideal
         set position of the arm.
         */
-        ARM_START = 0 * ARM_TICKS_PER_DEGREE;
-        ARM_LOW_BASKET = 360 * 2 * ARM_TICKS_PER_DEGREE;
-        ARM_HIGH_BASKET = 360 * 6 * ARM_TICKS_PER_DEGREE;
-        ARM_LOW_RUNG = 360 * ARM_TICKS_PER_DEGREE;
-        ARM_HIGH_RUNG = 360 * 2 * ARM_TICKS_PER_DEGREE;
-        armPosition = (int)ARM_START;
+        VERTICAL_ARM_TRANSFER = 0 * ARM_TICKS_PER_DEGREE;
+        VERTICAL_ARM_LOW_BASKET = 360 * 2 * ARM_TICKS_PER_DEGREE;
+        VERTICAL_ARM_HIGH_BASKET = 360 * 5.25 * ARM_TICKS_PER_DEGREE;
+        VERTICAL_ARM_LOW_RUNG = 360 * ARM_TICKS_PER_DEGREE;
+        VERTICAL_ARM_HIGH_RUNG = 360 * 2 * ARM_TICKS_PER_DEGREE;
+
+        VERTICAL_WRIST_TRANSFER = 0.039;
+        VERTICAL_WRIST_DEPOSIT = 0.1125;
+
+        HORIZONTAL_WRIST_TRANSFER = 0.555;
+        HORIZONTAL_WRIST_PICKUP = 0.0130;
+
+        CLAW_CLOSE = 1.0;
+        CLAW_OPEN = 0.95;
+
+        verticalArmPosition = (int) VERTICAL_ARM_TRANSFER;
 
         // Define and initialize ALL installed sensors (note: need to use reference to the actual OpMode).
         imu = myOpMode.hardwareMap.get(IMU.class, "imu");
@@ -151,8 +179,8 @@ public class RobotHardware {
         leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
-        leftArmDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightArmDrive.setDirection(DcMotorSimple.Direction.FORWARD);
+        leftVerticalArmDrive.setDirection(DcMotor.Direction.REVERSE);
+        rightVerticalArmDrive.setDirection(DcMotorSimple.Direction.FORWARD);
 
         // Ensure the robot is stationary. Reset the encoders and set the motors to BREAK mode
         leftFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -164,8 +192,8 @@ public class RobotHardware {
         leftBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftArmDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightArmDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftVerticalArmDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightVerticalArmDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Set the encoders for closed loop speed control, and reset the heading.
         leftFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -173,13 +201,13 @@ public class RobotHardware {
         rightFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         rightBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        // Set the TargetPostiion to 0. Then we'll set the RunMode to RUN_TO_POSITION, and we'll ask it to stop and reset.
-        leftArmDrive.setTargetPosition(0);
-        rightArmDrive.setTargetPosition(0);
-        leftArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        rightArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        leftArmDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightArmDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        // Set the TargetPosition to 0. Then we'll set the RunMode to RUN_TO_POSITION, and we'll ask it to stop and reset.
+        leftVerticalArmDrive.setTargetPosition(0);
+        rightVerticalArmDrive.setTargetPosition(0);
+        leftVerticalArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        rightVerticalArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        leftVerticalArmDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightVerticalArmDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         // Reset the IMU when initializing the hardware class
         imu.resetYaw();
@@ -262,8 +290,6 @@ public class RobotHardware {
         // Ensure that the OpMode is still active
         if (myOpMode.opModeIsActive()) {
 
-            setArmPosition();
-
             // Determine new target position, and pass to motor controller
             leftFrontTarget = leftFrontDrive.getCurrentPosition() + (int)(leftFrontInches * COUNTS_PER_INCH);
             leftBackTarget = leftBackDrive.getCurrentPosition() + (int)(leftBackInches * COUNTS_PER_INCH);
@@ -288,7 +314,7 @@ public class RobotHardware {
             /*
             Keep looping while we are still active, and there is time left, and all motors are running. Note, We use
             (isBusy() && isBusy() && isBusy()) in the loop test, which means that when ANY motor hits its target
-            position, the motion will stop. This is "safer" in the event that the robot will alwyas end the motion as
+            position, the motion will stop. This is "safer" in the event that the robot will always end the motion as
             soon as possible. However, if you require that ALL motors have finished their moves before the robot
             continues onto the next step, use (isBusy() || isBusy() || isBusy() || isBusy()) in the loop test.
              */
@@ -347,13 +373,62 @@ public class RobotHardware {
      * set the target position of our arm to match the variables that was selected by the driver. We also set the target
      * velocity (speed) the motor runs at, and use setMode to run it.
      */
-    public void setArmPosition() {
-        leftArmDrive.setTargetPosition((int) (armPosition));
-        rightArmDrive.setTargetPosition((int) (armPosition));
+    public void setVerticalArmPosition() {
+        leftVerticalArmDrive.setTargetPosition((int) (verticalArmPosition));
+        rightVerticalArmDrive.setTargetPosition((int) (verticalArmPosition));
 
-        ((DcMotorEx) leftArmDrive).setVelocity(2500);
-        ((DcMotorEx) rightArmDrive).setVelocity(2500);
-        leftArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        rightArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        ((DcMotorEx) leftVerticalArmDrive).setVelocity(2100);
+        ((DcMotorEx) rightVerticalArmDrive).setVelocity(2100);
+        leftVerticalArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        rightVerticalArmDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+
+    /**
+     * Send the two horizontalArm-servos to opposing (mirrored) positions.
+     *
+     * @param position  (0.0 to 1.0) +ve is extended
+     */
+    public void setHorizontalArmPosition(double position) {
+        // limit servo range to the range of the horizontal arm.
+        position /= 20;
+
+        leftHorizontalArmDrive.setPosition(position + 0.005);
+        rightHorizontalArmDrive.setPosition(1.0 - (position + 0.002));
+    }
+
+    /**
+     * Send the verticalWrist-servo to position
+     *
+     * @param position  (0.0 to 1.0) +ve is extended
+     */
+    public void setVerticalWristPosition(double position) {
+        verticalWristDrive.setPosition(position);
+    }
+
+    /**
+     * Send the horizontalWrist-servo to position
+     *
+     * @param position  (0.0 to 1.0) +ve is extended
+     */
+    public void setHorizontalWristPosition(double position) {
+        horizontalWristDrive.setPosition(position);
+    }
+
+    /**
+     * Send the claw-servo to position
+     *
+     * @param position  (0.0 to 1.0) +ve is open
+     */
+    public void setVerticalClawPosition(double position) {
+        verticalClawDrive.setPosition(position);
+    }
+
+    /**
+     * Send the claw-servo to position
+     *
+     * @param position  (0.0 to 1.0) +ve is open
+     */
+    public void setHorizontalClawPosition(double position) {
+        horizontalClawDrive.setPosition(position);
     }
 }

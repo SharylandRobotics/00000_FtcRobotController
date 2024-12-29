@@ -19,6 +19,8 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
         double drive;
         double strafe;
         double turn;
+        double verticalArm;
+        double horizontalArm;
 
         // Initialize all the hardware, using the hardware class.
         robot.init();
@@ -39,33 +41,61 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
             // Combine drive, strafe, and turn for blended motion. Use RobotHardware class
             robot.driveFieldCentric(drive, strafe, turn);
 
-
-            if (gamepad1.right_trigger > 0.5) {
-                robot.armPosition = robot.ARM_HIGH_BASKET;
-            } else if (gamepad1.right_trigger > 0.0) {
-                robot.armPosition = robot.ARM_LOW_BASKET;
-            } else if (gamepad1.right_trigger == 0) {
-                robot.armPosition = robot.ARM_START;
+            verticalArm = gamepad1.right_trigger;
+            horizontalArm = gamepad1.left_trigger;
+            if (gamepad1.right_trigger == 1 && gamepad1.left_trigger == 0) {
+                if (gamepad1.a) {
+                    robot.setVerticalClawPosition(robot.CLAW_OPEN);
+                } else {
+                    robot.setVerticalClawPosition(robot.CLAW_CLOSE);
+                }
+                robot.setHorizontalClawPosition(robot.CLAW_OPEN);
+                robot.setVerticalWristPosition(robot.VERTICAL_WRIST_DEPOSIT);
+                robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
+                robot.verticalArmPosition = robot.VERTICAL_ARM_HIGH_BASKET;
+            } else if (gamepad1.right_trigger > 0.1 && gamepad1.left_trigger == 0) {
+                if (gamepad1.a) {
+                    robot.setVerticalClawPosition(robot.CLAW_OPEN);
+                } else {
+                    robot.setVerticalClawPosition(robot.CLAW_CLOSE);
+                }
+                robot.setHorizontalClawPosition(robot.CLAW_OPEN);
+                robot.setVerticalWristPosition(robot.VERTICAL_WRIST_DEPOSIT);
+                robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
+                robot.verticalArmPosition = robot.VERTICAL_ARM_LOW_BASKET;
+            } else if (gamepad1.right_trigger > 0 && gamepad1.left_trigger == 0) {
+                robot.setVerticalClawPosition(robot.CLAW_CLOSE);
+                robot.setHorizontalClawPosition(robot.CLAW_OPEN);
+                robot.setVerticalWristPosition(robot.VERTICAL_WRIST_TRANSFER);
+                robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
+            } else if (gamepad1.right_trigger == 0 && gamepad1.left_trigger > 0) {
+                robot.setVerticalClawPosition(robot.CLAW_OPEN);
+                if(gamepad1.a) {
+                    robot.setHorizontalClawPosition(robot.CLAW_OPEN);
+                } else {
+                    robot.setHorizontalClawPosition(robot.CLAW_CLOSE);
+                }
+                robot.setVerticalWristPosition(robot.VERTICAL_WRIST_TRANSFER);
+                robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_PICKUP);
+                robot.verticalArmPosition = robot.VERTICAL_ARM_TRANSFER;
+            } else if (gamepad1.right_trigger == 0 && gamepad1.left_trigger == 0) {
+                robot.setVerticalClawPosition(robot.CLAW_OPEN);
+                robot.setHorizontalClawPosition(robot.CLAW_CLOSE);
+                robot.setVerticalWristPosition(robot.VERTICAL_WRIST_TRANSFER);
+                robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
+                robot.verticalArmPosition = robot.VERTICAL_ARM_TRANSFER;
             }
-
-            if (gamepad1.left_trigger > 0.5) {
-                robot.armPosition = robot.ARM_HIGH_RUNG;
-            } else if (gamepad1.left_trigger > 0.0) {
-                robot.armPosition = robot.ARM_LOW_RUNG;
-            } else if (gamepad1.dpad_down) {
-                robot.armPosition = robot.ARM_START;
-            }
-
-            robot.setArmPosition();
+            robot.setVerticalArmPosition();
+            robot.setHorizontalArmPosition(horizontalArm);
 
             // Send a telemetry message to explain controls and show robot status
             telemetry.addData("\nStatus", "Run Time: " + runtime);
-            telemetry.addData("Manual", "Drive %5.2f, Strafe %5.2f, Turn %5.2f ", drive, strafe, turn);
-            telemetry.addData("Arm Position", robot.armPosition/14);
+            telemetry.addData("Drive Power", "%.2f", drive);
+            telemetry.addData("Strafe Power", "%.2f", strafe);
+            telemetry.addData("Turn Power", "%.2f", turn);
+            telemetry.addData("\nVertical Arm Power", "%.2f", verticalArm);
+            telemetry.addData("Horizontal Arm", "%.2f", horizontalArm);
             telemetry.update();
-
-            // Place this loop so hands move at a reasonable speed
-            sleep(50);
         }
     }
 }

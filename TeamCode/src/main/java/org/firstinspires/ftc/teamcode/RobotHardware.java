@@ -64,11 +64,15 @@ public class RobotHardware {
 
     public double ARM_TICKS_PER_DEGREE;
 
-    public double VERTICAL_ARM_TRANSFER;
+    public double VERTICAL_ARM_MIN;
     public double VERTICAL_ARM_LOW_BASKET;
     public double VERTICAL_ARM_HIGH_BASKET;
     public double VERTICAL_ARM_LOW_RUNG;
     public double VERTICAL_ARM_HIGH_RUNG;
+
+    public double HORIZONTAL_ARM_MIN;
+    public double HORIZONTAL_ARM_MID;
+    public double HORIZONTAL_ARM_MAX;
 
     public double VERTICAL_WRIST_TRANSFER;
     public double VERTICAL_WRIST_DEPOSIT;
@@ -112,10 +116,10 @@ public class RobotHardware {
         These constants define the desired driving/control characteristics. They can/should be tweaked to suit the specific
         robot drive train.
          */
-        DRIVE_SPEED = 0.4; // Maximum autonomous driving speed for better distance accuracy.
-        STRAFE_SPEED = 0.4; // Maximum autonomous strafing speed for better distance accuracy.
-        TURN_SPEED = 0.4; // Maximum autonomous turning speed for better rotational accuracy.
-        HEADING_THRESHOLD = 1.0; // How close must the heading get to the target before moving to next step.
+        DRIVE_SPEED = 0.6; // Maximum autonomous driving speed for better distance accuracy.
+        STRAFE_SPEED = 0.6; // Maximum autonomous strafing speed for better distance accuracy.
+        TURN_SPEED = 0.6; // Maximum autonomous turning speed for better rotational accuracy.
+        HEADING_THRESHOLD = 0.2; // How close must the heading get to the target before moving to next step.
         // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
 
         /*
@@ -154,14 +158,18 @@ public class RobotHardware {
         per degree of the arm. This results in the number of encoders ticks the arm needs to move to achieve the ideal
         set position of the arm.
         */
-        VERTICAL_ARM_TRANSFER = 0 * ARM_TICKS_PER_DEGREE;
+        VERTICAL_ARM_MIN = 0 * ARM_TICKS_PER_DEGREE;
         VERTICAL_ARM_LOW_BASKET = 360 * 2 * ARM_TICKS_PER_DEGREE;
         VERTICAL_ARM_HIGH_BASKET = 360 * 5.25 * ARM_TICKS_PER_DEGREE;
         VERTICAL_ARM_LOW_RUNG = 360 * ARM_TICKS_PER_DEGREE;
         VERTICAL_ARM_HIGH_RUNG = 360 * 2 * ARM_TICKS_PER_DEGREE;
 
+        HORIZONTAL_ARM_MIN = 0.0;
+        HORIZONTAL_ARM_MID = 0.5;
+        HORIZONTAL_ARM_MAX = 1.0;
+
         VERTICAL_WRIST_TRANSFER = 0.039;
-        VERTICAL_WRIST_DEPOSIT = 0.1125;
+        VERTICAL_WRIST_DEPOSIT = 0.115;
 
         HORIZONTAL_WRIST_TRANSFER = 0.555;
         HORIZONTAL_WRIST_PICKUP = 0.0130;
@@ -169,7 +177,7 @@ public class RobotHardware {
         CLAW_CLOSE = 1.0;
         CLAW_OPEN = 0.95;
 
-        verticalArmPosition = (int) VERTICAL_ARM_TRANSFER;
+        verticalArmPosition = (int) VERTICAL_ARM_MIN;
 
         /*
          Define how the hub is mounted on the robot to get the correct Yaw, Pitch, and Roll values. There are two input
@@ -244,6 +252,150 @@ public class RobotHardware {
      * Drive on a fixed compass heading (angle), based on encoder counts. Move will stop if either of the following
      * conditions occurs: 1) Move gets to the desired position. 2) Driver stops the OpMode
      *
+     * @param maxDriveSpeed MAX Speed for forward/rev motion (range 0 to +1.0).
+     * @param distance      Distance (in inches) to move from current position. Negative distance means move backward.
+     * @param heading       Absolute Heading Angle (in Degrees) relative to last gyro reset.
+     *                      0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                      If a relative angle is required, add/subtract from current heading.
+     */
+    public void driveStraight(double maxDriveSpeed, double distance, double heading) {
+
+        // Ensure that the OpMode is still active
+        if (myOpMode.opModeIsActive()) {
+
+            // Determine new target position, and pass to motor controller
+            int moveCounts = (int)(distance * COUNTS_PER_INCH);
+            leftFrontTarget = leftFrontDrive.getCurrentPosition() + moveCounts;
+            leftBackTarget = leftBackDrive.getCurrentPosition() + moveCounts;
+            rightFrontTarget = rightFrontDrive.getCurrentPosition() + moveCounts;
+            rightBackTarget = rightBackDrive.getCurrentPosition() + moveCounts;
+
+            // Set Target FIRST, then turn on RUN_TO_POSITION
+            leftFrontDrive.setTargetPosition(leftFrontTarget);
+            leftBackDrive.setTargetPosition(leftBackTarget);
+            rightFrontDrive.setTargetPosition(rightFrontTarget);
+            rightBackDrive.setTargetPosition(rightBackTarget);
+
+            leftFrontDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            leftBackDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightFrontDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightBackDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // Set the required driving speed  (must be positive for RUN_TO_POSITION)
+            // Start driving straight, and then enter the control loop
+            maxDriveSpeed = Math.abs(maxDriveSpeed);
+            driveRobotCentric(maxDriveSpeed, 0, 0);
+
+            /*
+            Keep looping while we are still active, and there is time left, and all motors are running. Note, We use
+            (isBusy() && isBusy() && isBusy()) in the loop test, which means that when ANY motor hits its target
+            position, the motion will stop. This is "safer" in the event that the robot will always end the motion as
+            soon as possible. However, if you require that ALL motors have finished their moves before the robot
+            continues onto the next step, use (isBusy() || isBusy() || isBusy() || isBusy()) in the loop test.
+             */
+            while (myOpMode.opModeIsActive() &&
+                    (leftFrontDrive.isBusy() && leftBackDrive.isBusy() &&
+                            rightFrontDrive.isBusy() && rightBackDrive.isBusy())) {
+
+                // Determine required steering to keep on heading
+                yawPower = getSteeringCorrection(heading, P_AXIAL_GAIN);
+            }
+
+            // if driving in reverse, the motor correction also needs to be reversed
+            if (distance < 0)
+                yawPower *= -1.0;
+
+            // Apply the turning correction to the current driving power.
+            driveRobotCentric(axialPower, 0, yawPower);
+
+            // Display drive status for the driver.
+            sendTelemetry(true);
+
+            // Stop all motion & Turn off RUN_TO_POSITION
+            driveRobotCentric(0, 0, 0);
+            leftFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+    }
+
+    /**
+     * Drive on a fixed compass heading (angle), based on encoder counts. Move will stop if either of the following
+     * conditions occurs: 1) Move gets to the desired position. 2) Driver stops the OpMode
+     *
+     * @param maxStrafeSpeed MAX Speed for forward/rev motion (range 0 to +1.0).
+     * @param distance      Distance (in inches) to move from current position. Negative distance means move backward.
+     * @param heading       Absolute Heading Angle (in Degrees) relative to last gyro reset.
+     *                      0 = fwd. +ve is CCW from fwd. -ve is CW from forward.
+     *                      If a relative angle is required, add/subtract from current heading.
+     */
+    public void strafeStraight(double maxStrafeSpeed, double distance, double heading) {
+
+        // Ensure that the OpMode is still active
+        if (myOpMode.opModeIsActive()) {
+
+            // Determine new target position, and pass to motor controller
+            int moveCounts = (int)(distance * COUNTS_PER_INCH);
+            leftFrontTarget = leftFrontDrive.getCurrentPosition() + moveCounts;
+            leftBackTarget = leftBackDrive.getCurrentPosition() - moveCounts;
+            rightFrontTarget = rightFrontDrive.getCurrentPosition() - moveCounts;
+            rightBackTarget = rightBackDrive.getCurrentPosition() + moveCounts;
+
+            // Set Target FIRST, then turn on RUN_TO_POSITION
+            leftFrontDrive.setTargetPosition(leftFrontTarget);
+            leftBackDrive.setTargetPosition(leftBackTarget);
+            rightFrontDrive.setTargetPosition(rightFrontTarget);
+            rightBackDrive.setTargetPosition(rightBackTarget);
+
+            leftFrontDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            leftBackDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightFrontDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightBackDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // Set the required driving speed  (must be positive for RUN_TO_POSITION)
+            // Start driving straight, and then enter the control loop
+            maxStrafeSpeed = Math.abs(maxStrafeSpeed);
+            driveRobotCentric(0, maxStrafeSpeed, 0);
+
+            /*
+            Keep looping while we are still active, and there is time left, and all motors are running. Note, We use
+            (isBusy() && isBusy() && isBusy()) in the loop test, which means that when ANY motor hits its target
+            position, the motion will stop. This is "safer" in the event that the robot will always end the motion as
+            soon as possible. However, if you require that ALL motors have finished their moves before the robot
+            continues onto the next step, use (isBusy() || isBusy() || isBusy() || isBusy()) in the loop test.
+             */
+            while (myOpMode.opModeIsActive() &&
+                    (leftFrontDrive.isBusy() && leftBackDrive.isBusy() &&
+                            rightFrontDrive.isBusy() && rightBackDrive.isBusy())) {
+
+                // Determine required steering to keep on heading
+                yawPower = getSteeringCorrection(heading, P_AXIAL_GAIN);
+            }
+
+            // if driving in reverse, the motor correction also needs to be reversed
+            if (distance < 0)
+                yawPower *= -1.0;
+
+            // Apply the turning correction to the current driving power.
+            driveRobotCentric(0, lateralPower, yawPower);
+
+            // Display drive status for the driver.
+            sendTelemetry(true);
+
+            // Stop all motion & Turn off RUN_TO_POSITION
+            driveRobotCentric(0, 0, 0);
+            leftFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+    }
+
+    /**
+     * Drive on a fixed compass heading (angle), based on encoder counts. Move will stop if either of the following
+     * conditions occurs: 1) Move gets to the desired position. 2) Driver stops the OpMode
+     *
      * @param maxAxialSpeed MAX Speed for forward/rev motion (range 0 to +1.0).
      * @param distance      Distance (in inches) to move from current position. Negative distance means move backward.
      * @param heading       Absolute Heading Angle (in Degrees) relative to last gyro reset.
@@ -301,7 +453,7 @@ public class RobotHardware {
             driveFieldCentric(axialPower, 0, yawPower);
 
             // Display drive status for the driver.
-            sendTelemetry(true, false);
+            sendTelemetry(true);
 
             // Stop all motion & Turn off RUN_TO_POSITION
             driveFieldCentric(0, 0, 0);
@@ -373,7 +525,7 @@ public class RobotHardware {
             driveFieldCentric(0, lateralPower, yawPower);
 
             // Display drive status for the driver.
-            sendTelemetry(false, true);
+            sendTelemetry(true);
 
             // Stop all motion & Turn off RUN_TO_POSITION
             driveFieldCentric(0, 0, 0);
@@ -411,7 +563,7 @@ public class RobotHardware {
             driveFieldCentric(0, 0, yawPower);
 
             // Display drive status for the driver.
-            sendTelemetry(false, false);
+            sendTelemetry(false);
         }
 
         // Stop all motion
@@ -445,7 +597,7 @@ public class RobotHardware {
             driveFieldCentric(0, 0, yawPower);
 
             // Display drive status for the driver.
-            sendTelemetry(false, false);
+            sendTelemetry(false);
         }
 
         // Stop all motion;
@@ -473,6 +625,51 @@ public class RobotHardware {
 
         // Multiply the error by the gain to determine the required steering correction/  Limit the result to +/- 1.0
         return Range.clip(headingError * proportionalGain, -1, 1);
+    }
+
+    /**
+     * Calculate the motor powers required to achieve the requested robot motions:
+     * Drive (Axial motion), Strafe (Lateral motion), and Turn (Yaw motion)
+     * Then send these power levels to the motors.
+     *
+     * @param axial     Forward/Reverse driving power (-1.0 to 1.0) +ve is forward
+     * @param lateral    Right/Left driving power (-1.0 to 1.0) +ve is right
+     * @param yaw      Right/Left turning power (-1.0 to 1.0) +ve is clockwise
+     */
+    public void driveRobotCentric(double axial, double lateral, double yaw) {
+
+        axialPower = axial;
+        lateralPower = lateral;
+        yawPower = yaw;
+
+        double max;
+
+        /*
+         Combine the joystick requests for each axis-motion to determine each wheel's power. Set up a variable for each
+         drive wheel to save the power level for telemetry. Denominator is the largest motor power (absolute value) or
+         1. This ensures all the powers maintain the same ratio, but only when at least one is out of the range [-1, 1]
+         */
+        double denominator = Math.max(Math.abs(axial) + Math.abs(lateral) + Math.abs(yaw), 1);
+        leftFrontPower = (axial + lateral + yaw) / denominator;
+        leftBackPower = (axial - lateral + yaw) / denominator;
+        rightFrontPower = (axial - lateral - yaw) / denominator;
+        rightBackPower = (axial + lateral - yaw) / denominator;
+
+        // Normalize the values so no wheel power exceeds 100%.
+        // This ensures that the robot maintains the desired motion.
+        max = Math.max(Math.abs(leftFrontPower), Math.abs(leftBackPower));
+        max = Math.max(max, Math.abs(rightFrontPower));
+        max = Math.max(max, Math.abs(rightBackPower));
+
+        if (max > 1.0) {
+            leftFrontPower /= max;
+            leftBackPower /= max;
+            rightFrontPower /= max;
+            rightBackPower /= max;
+        }
+
+        // Use existing function to drive all wheels.
+        setDrivePower(leftFrontPower, leftBackPower, rightFrontPower, rightBackPower);
     }
 
     /**
@@ -545,22 +742,13 @@ public class RobotHardware {
     /**
      *  Display the various control parameters while driving
      *
-     * @param axial     Set to true if we are driving on the axial plane, and the encoder positions should be included
-     *                  in the telemetry.
-     * @param lateral   Set to true if we are driving on the lateral plane, and the encoder positions should be included
+     * @param axial     Set to true if we are driving straight, and the encoder positions should be included
      *                  in the telemetry.
      */
-    private void sendTelemetry(boolean axial, boolean lateral) {
+    private void sendTelemetry(boolean axial) {
 
         if (axial) {
             myOpMode.telemetry.addData("Motion", "Drive Axial");
-            myOpMode.telemetry.addData("Target Pos LF:LB:RF:RB", "%7d:%7d:%7d:%7d",
-                    leftFrontTarget, leftBackTarget, rightFrontTarget, rightBackTarget);
-            myOpMode.telemetry.addData("Actual Pos LF:LB:RF:RB", "%7d:%7d:%7d:%7d",
-                    leftFrontDrive.getCurrentPosition(), leftBackDrive.getCurrentPosition(),
-                    rightFrontDrive.getCurrentPosition(), rightBackDrive.getCurrentPosition());
-        } else if (lateral) {
-            myOpMode.telemetry.addData("Motion", "Drive Lateral");
             myOpMode.telemetry.addData("Target Pos LF:LB:RF:RB", "%7d:%7d:%7d:%7d",
                     leftFrontTarget, leftBackTarget, rightFrontTarget, rightBackTarget);
             myOpMode.telemetry.addData("Actual Pos LF:LB:RF:RB", "%7d:%7d:%7d:%7d",
@@ -591,9 +779,9 @@ public class RobotHardware {
      * set the target position of our arm to match the variables that was selected by the driver. We also set the target
      * velocity (speed) the motor runs at, and use setMode to run it.
      */
-    public void setVerticalArmPosition() {
-        // leftVerticalArmDrive.setTargetPosition((int) (verticalArmPosition));
-        rightVerticalArmDrive.setTargetPosition((int) (verticalArmPosition));
+    public void setVerticalArmPosition(double position) {
+        // leftVerticalArmDrive.setTargetPosition((int) (position));
+        rightVerticalArmDrive.setTargetPosition((int) (position));
 
         // ((DcMotorEx) leftVerticalArmDrive).setVelocity(2100);
         ((DcMotorEx) rightVerticalArmDrive).setVelocity(2100);

@@ -32,8 +32,8 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
         // Run until the end of the match (driver presses STOP).
         while (opModeIsActive()) {
 
-            // Field Centric Mode use the left joystick to go forward & strafe,
-            // and the right joystick to rotate from the perspective of the driver
+            // Field Centric Mode use the left joystick to go forward & strafe and the right joystick to rotate from
+            // the perspective of the driver
             drive = -gamepad1.left_stick_y;
             strafe = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
             turn = gamepad1.right_stick_x;
@@ -52,7 +52,7 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
                 robot.setHorizontalClawPosition(robot.CLAW_OPEN);
                 robot.setVerticalWristPosition(robot.VERTICAL_WRIST_DEPOSIT);
                 robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
-                robot.verticalArmPosition = robot.VERTICAL_ARM_HIGH_BASKET;
+                robot.setVerticalArmPosition(robot.VERTICAL_ARM_HIGH_BASKET);
             } else if (gamepad1.right_trigger > 0.1 && gamepad1.left_trigger == 0) {
                 if (gamepad1.a) {
                     robot.setVerticalClawPosition(robot.CLAW_OPEN);
@@ -62,12 +62,13 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
                 robot.setHorizontalClawPosition(robot.CLAW_OPEN);
                 robot.setVerticalWristPosition(robot.VERTICAL_WRIST_DEPOSIT);
                 robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
-                robot.verticalArmPosition = robot.VERTICAL_ARM_LOW_BASKET;
+                robot.setVerticalArmPosition(robot.VERTICAL_ARM_LOW_BASKET);
             } else if (gamepad1.right_trigger > 0 && gamepad1.left_trigger == 0) {
                 robot.setVerticalClawPosition(robot.CLAW_CLOSE);
                 robot.setHorizontalClawPosition(robot.CLAW_OPEN);
                 robot.setVerticalWristPosition(robot.VERTICAL_WRIST_TRANSFER);
                 robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
+                robot.setVerticalArmPosition(robot.VERTICAL_ARM_MIN);
             } else if (gamepad1.right_trigger == 0 && gamepad1.left_trigger > 0) {
                 robot.setVerticalClawPosition(robot.CLAW_OPEN);
                 if(gamepad1.a) {
@@ -77,15 +78,14 @@ public class TeleOpDriveFieldCentric extends LinearOpMode {
                 }
                 robot.setVerticalWristPosition(robot.VERTICAL_WRIST_TRANSFER);
                 robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_PICKUP);
-                robot.verticalArmPosition = robot.VERTICAL_ARM_TRANSFER;
+                robot.setVerticalArmPosition(robot.VERTICAL_ARM_MIN);
             } else if (gamepad1.right_trigger == 0 && gamepad1.left_trigger == 0) {
                 robot.setVerticalClawPosition(robot.CLAW_OPEN);
                 robot.setHorizontalClawPosition(robot.CLAW_CLOSE);
                 robot.setVerticalWristPosition(robot.VERTICAL_WRIST_TRANSFER);
                 robot.setHorizontalWristPosition(robot.HORIZONTAL_WRIST_TRANSFER);
-                robot.verticalArmPosition = robot.VERTICAL_ARM_TRANSFER;
+                robot.setVerticalArmPosition(robot.VERTICAL_ARM_MIN);
             }
-            robot.setVerticalArmPosition();
             robot.setHorizontalArmPosition(horizontalArm);
 
             // Send a telemetry message to explain controls and show robot status
